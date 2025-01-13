@@ -225,14 +225,14 @@ export default function GitHubReceipts() {
               <ArrowUpRight className="size-3 inline" />
             </a>{" "}
             |{" "}
-            <a
+            {/* <a
               href="https://buymeacoffee.com/vishwagauravin"
               target="_blank"
               rel="norefferer noopener"
               className="hover:underline"
             >
               buy me a coffee <ArrowUpRight className="size-3 inline" />
-            </a>
+            </a> */}
           </div>
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {isDark ? (

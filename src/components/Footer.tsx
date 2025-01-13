@@ -40,7 +40,7 @@ export default function Footer() {
         </a>
       </div>
       <a
-        href="https://villgax-in.netlify.app/"
+        href="https://porto-io.vercel.app/"
         target="_blank"
         rel="noreferrer"
         aria-label="Visit my Portfolio"
