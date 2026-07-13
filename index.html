@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub Receipt Generator</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+.container { max-width: 480px; width: 100%; }
+.header { text-align: center; margin-bottom: 24px; }
+.header h1 { font-size: 28px; color: #24292e; margin-bottom: 8px; }
+.header p { color: #586069; font-size: 14px; }
+.form { display: flex; gap: 8px; margin-bottom: 16px; }
+.input { flex: 1; padding: 10px 14px; border: 1px solid #d1d5da; border-radius: 6px; font-size: 14px; outline: none; }
+.input:focus { border-color: #0366d6; box-shadow: 0 0 0 3px rgba(3,102,214,0.1); }
+.btn { padding: 10px 20px; background: #2ea44f; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 500; }
+.btn:hover { background: #2c974b; }
+.btn:disabled { background: #94d3a2; cursor: not-allowed; }
+.styles { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+.style-btn { padding: 6px 12px; border: 1px solid #d1d5da; border-radius: 6px; background: white; cursor: pointer; font-size: 12px; }
+.style-btn.active { border-color: #0366d6; background: #f1f8ff; color: #0366d6; }
+.receipt-wrap { background: white; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.12); overflow: hidden; margin-bottom: 16px; }
+.receipt { padding: 24px; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.6; position: relative; }
+.receipt.style-vintage { background: #f5e6c8; color: #2c1810; }
+.receipt.style-minimal { background: #fff; color: #000; }
+.receipt.style-neon { background: #0a0a0a; color: #00ff88; }
+.receipt.style-terminal { background: #1e1e1e; color: #00ff00; }
+.receipt.style-classic { background: #fefefe; color: #000; }
+.tear { height: 8px; background: linear-gradient(135deg, transparent 33.33%, #ddd 33.33%, #ddd 66.67%, transparent 66.67%); background-size: 12px 8px; }
+.receipt-title { text-align: center; font-size: 18px; font-weight: bold; margin-bottom: 4px; }
+.receipt-date { text-align: center; font-size: 11px; opacity: 0.7; margin-bottom: 16px; }
+.receipt-section { border-top: 1px dashed; padding-top: 12px; margin-top: 12px; }
+.receipt-section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.receipt-row { display: flex; justify-content: space-between; margin: 4px 0; }
+.receipt-label { font-weight: bold; }
+.receipt-footer { text-align: center; margin-top: 16px; font-size: 11px; opacity: 0.7; }
+.actions { display: flex; gap: 8px; justify-content: center; }
+.btn-download { background: #0366d6; }
+.btn-download:hover { background: #0256b9; }
+.error { background: #ffeef0; color: #cb2431; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 16px; }
+.hidden { display: none; }
+.token-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.token-input { flex: 1; padding: 8px 12px; border: 1px solid #d1d5da; border-radius: 6px; font-size: 12px; outline: none; }
+.token-label { font-size: 12px; color: #586069; white-space: nowrap; }
+.token-hint { font-size: 11px; color: #586069; margin-bottom: 16px; }
+.token-hint a { color: #0366d6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>GitHub Receipt</h1>
+    <p>Generate a receipt-style summary of your GitHub profile</p>
+  </div>
+  
+  <div class="form">
+    <input type="text" class="input" id="username" placeholder="Enter GitHub username" autofocus>
+    <button class="btn" id="generateBtn" onclick="generate()">Generate</button>
+  </div>
+  
+  <div class="token-row">
+    <span class="token-label">Token:</span>
+    <input type="password" class="token-input" id="token" placeholder="ghp_xxxxx (optional, 5000 req/hour)">
+  </div>
+  <div class="token-hint">Optional. Get token at <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a>. Without: 60 req/hour.</div>
+  
+  <div class="styles" id="styles">
+    <button class="style-btn active" data-style="classic">Classic</button>
+    <button class="style-btn" data-style="vintage">Vintage</button>
+    <button class="style-btn" data-style="minimal">Minimal</button>
+    <button class="style-btn" data-style="neon">Neon</button>
+    <button class="style-btn" data-style="terminal">Terminal</button>
+  </div>
+  
+  <div id="error" class="error hidden"></div>
+  
+  <div id="result" class="hidden">
+    <div class="receipt-wrap">
+      <div class="tear"></div>
+      <div class="receipt" id="receipt"></div>
+      <div class="tear"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-download" onclick="download()">Download PNG</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentStyle = 'classic';
+let receiptData = null;
+
+// Restore saved token
+const savedToken = localStorage.getItem('github_token');
+if (savedToken) document.getElementById('token').value = savedToken;
+
+// Save token on change
+document.getElementById('token').addEventListener('change', e => {
+  if (e.target.value.trim()) localStorage.setItem('github_token', e.target.value.trim());
+  else localStorage.removeItem('github_token');
+});
+
+document.querySelectorAll('.style-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentStyle = btn.dataset.style;
+    if (receiptData) renderReceipt(receiptData);
+  });
+});
+
+document.getElementById('username').addEventListener('keydown', e => {
+  if (e.key === 'Enter') generate();
+});
+
+async function generate() {
+  const username = document.getElementById('username').value.trim();
+  if (!username) return;
+  
+  const btn = document.getElementById('generateBtn');
+  const errorEl = document.getElementById('error');
+  const resultEl = document.getElementById('result');
+  
+  btn.disabled = true;
+  btn.textContent = 'Loading...';
+  errorEl.classList.add('hidden');
+  resultEl.classList.add('hidden');
+  
+  try {
+    const token = document.getElementById('token').value.trim();
+    const headers = token ? { 'Authorization': `token ${token}` } : {};
+    
+    const [userRes, reposRes] = await Promise.all([
+      fetch(`https://api.github.com/users/${username}`, { headers }),
+      fetch(`https://api.github.com/users/${username}/repos?per_page=100`, { headers })
+    ]);
+    
+    if (!userRes.ok) {
+      if (userRes.status === 404) throw new Error(`User "${username}" not found`);
+      if (userRes.status === 403) throw new Error('Rate limit exceeded. Try again later.');
+      throw new Error('Failed to fetch user data');
+    }
+    
+    const user = await userRes.json();
+    const repos = await reposRes.json();
+    
+    const languages = {};
+    let stars = 0, forks = 0;
+    repos.forEach(r => {
+      if (r.language) languages[r.language] = (languages[r.language] || 0) + 1;
+      stars += r.stargazers_count || 0;
+      forks += r.forks_count || 0;
+    });
+    
+    const topLangs = Object.entries(languages)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(l => l[0])
+      .join(', ') || 'N/A';
+    
+    receiptData = {
+      name: user.name || username,
+      login: user.login,
+      repos: user.public_repos,
+      followers: user.followers,
+      following: user.following,
+      stars,
+      forks,
+      languages: topLangs,
+      score: user.public_repos + stars + user.followers,
+      date: new Date().toLocaleDateString('zh-CN'),
+      time: new Date().toLocaleTimeString('zh-CN'),
+    };
+    
+    renderReceipt(receiptData);
+    resultEl.classList.remove('hidden');
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Generate';
+  }
+}
+
+function renderReceipt(d) {
+  const el = document.getElementById('receipt');
+  el.className = `receipt style-${currentStyle}`;
+  el.innerHTML = `
+    <div class="receipt-title">GITHUB RECEIPT</div>
+    <div class="receipt-date">${d.date} ${d.time}</div>
+    <div class="receipt-section">
+      <div class="receipt-row"><span>CUSTOMER:</span><span>${d.name}</span></div>
+      <div class="receipt-row"><span>@${d.login}</span><span></span></div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-row"><span>REPOSITORIES</span><span>${d.repos}</span></div>
+      <div class="receipt-row"><span>STARS</span><span>${d.stars.toLocaleString()}</span></div>
+      <div class="receipt-row"><span>FORKS</span><span>${d.forks.toLocaleString()}</span></div>
+      <div class="receipt-row"><span>FOLLOWERS</span><span>${d.followers.toLocaleString()}</span></div>
+      <div class="receipt-row"><span>FOLLOWING</span><span>${d.following.toLocaleString()}</span></div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-row"><span>TOP LANGUAGES</span><span>${d.languages}</span></div>
+    </div>
+    <div class="receipt-section">
+      <div class="receipt-row"><span>PROFILE SCORE</span><span>${d.score.toLocaleString()}</span></div>
+    </div>
+    <div class="receipt-footer">
+      <div>THANK YOU FOR CODING!</div>
+      <div>github.com/${d.login}</div>
+    </div>
+  `;
+}
+
+async function download() {
+  const el = document.getElementById('receipt');
+  const wrap = el.parentElement;
+  
+  // Use html2canvas-like approach with canvas API
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const scale = 2;
+  
+  // Measure
+  const rect = wrap.getBoundingClientRect();
+  canvas.width = rect.width * scale;
+  canvas.height = rect.height * scale;
+  ctx.scale(scale, scale);
+  
+  // Draw background
+  const styles = getComputedStyle(wrap);
+  ctx.fillStyle = styles.backgroundColor || '#fff';
+  ctx.fillRect(0, 0, rect.width, rect.height);
+  
+  // Draw text content
+  const receiptEl = document.getElementById('receipt');
+  const rRect = receiptEl.getBoundingClientRect();
+  const rStyle = getComputedStyle(receiptEl);
+  
+  ctx.fillStyle = rStyle.backgroundColor || '#fff';
+  ctx.fillRect(rRect.left - rect.left, rRect.top - rect.top, rRect.width, rRect.height);
+  
+  ctx.fillStyle = rStyle.color || '#000';
+  ctx.font = '13px Courier New, monospace';
+  
+  const lines = el.innerText.split('\n');
+  let y = rRect.top - rect.top + 20;
+  const x = rRect.left - rect.left + 24;
+  
+  lines.forEach(line => {
+    if (line.includes('GITHUB RECEIPT')) {
+      ctx.font = 'bold 18px Courier New, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(line, rRect.width / 2, y);
+      ctx.textAlign = 'left';
+      ctx.font = '13px Courier New, monospace';
+    } else {
+      ctx.fillText(line, x, y);
+    }
+    y += 20;
+  });
+  
+  // Download
+  const link = document.createElement('a');
+  link.download = `github-receipt-${receiptData?.login || 'user'}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+</script>
+</body>
+</html>

@@ -1,93 +1,83 @@
 # GitHub Receipt Generator
 
-Generate a receipt-style summary of your GitHub profile. Showcase your repositories, stars, and contributions in a unique, receipt-style summary. It's the perfect way to visualize your GitHub journey and celebrate your coding milestones.
+生成 GitHub 个人资料的收据风格图片。
 
-<!-- ![image](https://github.com/user-attachments/assets/30486c89-e563-4cf9-ac68-05475ccf3311) -->
+![Classic Style](preview.png)
 
-## Table of Contents
+## 两种使用方式
 
-- [Features](#features)
-- [Usage](#usage)
-- [Technologies Used](#technologies-used)
-- [Contributing](#contributing)
-- [License](#license)
+### 方式 1：直接打开 HTML（最简单）
 
-## Features
+双击 `index.html`，浏览器打开即可使用。无需安装任何东西。
 
-- Generate a visually appealing receipt-style summary of a GitHub user's profile
-- Display key GitHub statistics including:
-  - Repositories count
-  - Stars earned
-  - Repo forks
-  - Followers and following count
-  - Top programming languages
-  - Commits in the last 30 days
-  - Contribution score
-- Realistic receipt design with tear-off edges and a barcode
-- Dark mode toggle
-- Download receipt as an image
-- Share receipt directly from the application
+- 输入 GitHub 用户名
+- 选择风格（5 种可选）
+- 点击 Generate 生成
+- 点击 Download 下载 PNG
 
-## Usage
+### 方式 2：Python 命令行
 
-1. Enter a GitHub username in the input field.
-2. Click the "Generate" button or press Enter.
-3. View the generated GitHub receipt.
-4. Use the "Download" button to save the receipt as an image.
-5. Use the "Share" button to share the receipt directly (on supported devices).
+```bash
+# 安装依赖
+pip install -r requirements.txt
 
-## Technologies Used
+# 生成收据
+python github_receipt.py torvalds
 
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- html2canvas
-- jsbarcode
+# 指定风格
+python github_receipt.py torvalds -s neon
+
+# 指定输出文件
+python github_receipt.py torvalds -s vintage -o my.png
+```
+
+Windows 用户可双击 `receipt.bat`。
+
+## 风格预览
+
+| 风格 | 命令参数 | 说明 |
+|------|----------|------|
+| Classic | `classic` | 经典收据（默认） |
+| Vintage | `vintage` | 复古泛黄 |
+| Minimal | `minimal` | 极简黑白 |
+| Neon | `neon` | 霓虹暗色 |
+| Terminal | `terminal` | 终端风格 |
+
+## GitHub Token
+
+未认证 API 限制 60 次/小时。设置 Token 可提升到 5000 次/小时。
+
+**HTML 版本：** 页面上有 Token 输入框，输入后自动保存到浏览器。
+
+**Python 版本：**
+```bash
+# 方式 1：环境变量
+export GITHUB_TOKEN=ghp_xxxxx
+
+# 方式 2：命令行参数
+python github_receipt.py torvalds -t ghp_xxxxx
+```
+
+获取 Token：https://github.com/settings/tokens （勾选 `repo` 权限即可）
+
+## 国内镜像
+
+pip 安装慢时使用清华镜像：
+
+```bash
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+## 文件说明
+
+```
+├── index.html          # 网页版（双击打开）
+├── github_receipt.py   # Python CLI 版本
+├── receipt.bat         # Windows 快捷启动
+├── requirements.txt    # Python 依赖
+└── README.md
+```
 
 ## License
 
-This project is licensed under the GNU License.
-
----
-
-<details><summary>Setup</summary>
-
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-</details>
+GNU License

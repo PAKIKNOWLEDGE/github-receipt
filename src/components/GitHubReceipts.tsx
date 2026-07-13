@@ -3,165 +3,112 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Moon, Sun, Download, Share2, ArrowUpRight } from "lucide-react";
+import { Moon, Sun, Download, Share2, ArrowUpRight, Loader2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import JsBarcode from "jsbarcode";
 
+type Receipt = {
+  topLanguages: string;
+  date: string;
+  time: string;
+  order: number;
+  authCode: number;
+  cardNumber: string;
+  mostActiveDay: string;
+  commits30d: number;
+  starsEarned: number;
+  repoForks: number;
+  profileScore: number;
+  public_repos: number;
+  public_gists: number;
+  followers: number;
+  following: number;
+  name: string;
+  login: string;
+};
+
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
 export default function GitHubReceipts() {
   const [username, setUsername] = useState("");
-  type Receipt = {
-    topLanguages: string;
-    date: string;
-    time: string;
-    order: number;
-    authCode: number;
-    cardNumber: string;
-    mostActiveDay: string;
-    commits30d: number;
-    starsEarned: number;
-    repoForks: number;
-    profileScore: number;
-    public_repos: number;
-    public_gists: number;
-    followers: number;
-    following: number;
-    name: string;
-    login: string;
-  };
-
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [isDark, setIsDark] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
 
   const generateReceipt = async () => {
+    if (!username.trim()) {
+      setError("Please enter a GitHub username");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setReceipt(null);
+
     try {
-      const userResponse = await fetch(
-        `https://api.github.com/users/${username}`
-      );
-      const userData = (await userResponse.json()) as {
-        public_repos: number;
-        public_gists: number;
-        followers: number;
-        following: number;
-        name: string;
-        login: string;
-      };
+      const res = await fetch(`/api/github/${encodeURIComponent(username.trim())}`);
 
-      const reposResponse = await fetch(
-        `https://api.github.com/users/${username}/repos`
-      );
-      const reposData = (await reposResponse.json()) as {
-        language: string;
-        stargazers_count: number;
-        forks_count: number;
-      }[];
-
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      const dateString = thirtyDaysAgo.toISOString().split("T")[0];
-
-      const commitsResponse = await fetch(
-        `https://api.github.com/search/commits?q=author:${username}+committer-date:>=${dateString}`,
-        {
-          headers: {
-            Accept: "application/vnd.github.v3+json",
-          },
+      if (!res.ok) {
+        const data = await res.json();
+        if (res.status === 404) {
+          setError(`User "${username}" not found on GitHub`);
+        } else if (res.status === 403) {
+          setError("Rate limit exceeded. Please try again later or add a GITHUB_TOKEN to .env.local");
+        } else {
+          setError(data.error || "Failed to fetch GitHub data");
         }
-      );
-      const commitsData = (await commitsResponse.json()) as {
-        total_count: number;
+        return;
+      }
+
+      const data = await res.json();
+      const currentDate = new Date();
+
+      const newReceipt: Receipt = {
+        ...data,
+        date: currentDate
+          .toLocaleDateString("en-US", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+          })
+          .toUpperCase(),
+        time: currentDate.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }),
+        order: Math.floor(Math.random() * 90000) + 10000,
+        authCode: Math.floor(Math.random() * 900000) + 100000,
+        cardNumber:
+          "**** **** **** " +
+          Math.floor(Math.random() * 10000)
+            .toString()
+            .padStart(4, "0"),
+        mostActiveDay: DAYS[Math.floor(Math.random() * 7)],
       };
 
-      const languages = reposData.reduce(
-        (acc: Record<string, number>, repo: { language: string | null }) => {
-          if (repo.language) {
-            acc[repo.language] = (acc[repo.language] || 0) + 1;
-          }
-          return acc;
-        },
-        {}
-      );
+      setReceipt(newReceipt);
 
-      const topLanguages = Object.entries(languages)
-        .sort(([, a]: [string, number], [, b]: [string, number]) => b - a)
-        .slice(0, 3)
-        .map(([lang]) => lang)
-        .join(", ");
-
-      if (userResponse.ok) {
-        const currentDate = new Date();
-        const newReceipt = {
-          ...userData,
-          topLanguages,
-          date: currentDate
-            .toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })
-            .toUpperCase(),
-          time: currentDate.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: false,
-          }),
-          order: Math.floor(Math.random() * 90000) + 10000,
-          authCode: Math.floor(Math.random() * 900000) + 100000,
-          cardNumber:
-            "**** **** **** " +
-            Math.floor(Math.random() * 10000)
-              .toString()
-              .padStart(4, "0"),
-          mostActiveDay: [
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-          ][Math.floor(Math.random() * 7)],
-          commits30d: commitsData.total_count,
-          starsEarned: reposData.reduce(
-            (sum: number, repo: { stargazers_count: number }) =>
-              sum + repo.stargazers_count,
-            0
-          ),
-          repoForks: reposData.reduce(
-            (sum: number, repo: { forks_count: number }) =>
-              sum + repo.forks_count,
-            0
-          ),
-          profileScore:
-            userData.public_repos +
-            userData.public_gists +
-            userData.followers +
-            userData.following +
-            reposData.reduce(
-              (sum: number, repo: { stargazers_count: number }) =>
-                sum + repo.stargazers_count,
-              0
-            ),
-        };
-        setReceipt(newReceipt);
-
-        // Generate barcode after setting receipt
-        setTimeout(() => {
-          if (barcodeRef.current) {
-            JsBarcode(barcodeRef.current, `https://github.com/${username}`, {
-              format: "CODE128",
-              width: 1,
-              height: 30,
-              displayValue: false,
-            });
-          }
-        }, 0);
-      }
-    } catch (error) {
-      console.error("Error fetching GitHub data:", error);
+      // Generate barcode after setting receipt
+      setTimeout(() => {
+        if (barcodeRef.current) {
+          JsBarcode(barcodeRef.current, `https://github.com/${data.login}`, {
+            format: "CODE128",
+            width: 1,
+            height: 30,
+            displayValue: false,
+          });
+        }
+      }, 0);
+    } catch {
+      setError("Network error. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -197,8 +144,8 @@ export default function GitHubReceipts() {
               title: "GitHub Receipt",
               text: "Check out my GitHub Receipt!",
             });
-          } catch (error) {
-            console.error("Error sharing:", error);
+          } catch {
+            // Share cancelled or not supported
           }
         }
       });
@@ -223,16 +170,7 @@ export default function GitHubReceipts() {
             >
               GitHub Repo
               <ArrowUpRight className="size-3 inline" />
-            </a>{" "}
-            |{" "}
-            {/* <a
-              href="https://buymeacoffee.com/vishwagauravin"
-              target="_blank"
-              rel="norefferer noopener"
-              className="hover:underline"
-            >
-              buy me a coffee <ArrowUpRight className="size-3 inline" />
-            </a> */}
+            </a>
           </div>
           <Button variant="ghost" size="icon" onClick={toggleTheme}>
             {isDark ? (
@@ -256,9 +194,25 @@ export default function GitHubReceipts() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && generateReceipt()}
+            disabled={loading}
           />
-          <Button onClick={generateReceipt}>Generate</Button>
+          <Button onClick={generateReceipt} disabled={loading}>
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Loading
+              </>
+            ) : (
+              "Generate"
+            )}
+          </Button>
         </div>
+
+        {error && (
+          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm text-center">
+            {error}
+          </div>
+        )}
 
         {receipt && (
           <>
@@ -266,9 +220,23 @@ export default function GitHubReceipts() {
               ref={receiptRef}
               className="bg-white text-black p-8 rounded-lg shadow-lg font-mono relative overflow-hidden w-[350px] mx-auto"
               style={{
-                backgroundImage: 'url("/paper-texture.png")',
-                backgroundBlendMode: "multiply",
-                backgroundSize: "cover",
+                backgroundImage: `
+                  repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0,0,0,0.015) 2px,
+                    rgba(0,0,0,0.015) 4px
+                  ),
+                  repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0,0,0,0.01) 2px,
+                    rgba(0,0,0,0.01) 4px
+                  )
+                `,
+                backgroundColor: "#fefefe",
               }}
             >
               {/* Top tear */}
